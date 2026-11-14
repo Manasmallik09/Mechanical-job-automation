@@ -4,7 +4,7 @@ A mobile-friendly private-workspace starter for organising a mechanical engineer
 
 ## Current state
 
-This repository contains the dashboard interface and a starter database schema. It is **not yet a live job-search or application automation service**.
+This repository contains a Next.js dashboard configured for static export and GitHub Pages. It is **not yet a live job-search or application automation service**.
 
 - The included job rows are illustrative sample records, not verified vacancies.
 - Adding a job currently stores it in browser memory only; it is not persisted.
@@ -19,6 +19,12 @@ This repository contains the dashboard interface and a starter database schema. 
 - A GitHub repository
 - Optional later: Supabase project and Vercel account
 
+## GitHub Pages deployment
+
+The project is configured to export static files to `out/` with the project-site base path `/Mechanical-job-automation`. The workflow at `.github/workflows/deploy.yml` builds and deploys the site whenever `main` is updated.
+
+In **Settings → Pages**, set **Source** to **GitHub Actions**. Then check the Actions tab for the first successful deployment. The published URL is `https://manasmallik09.github.io/Mechanical-job-automation/`.
+
 ## Run locally
 
 ```bash
@@ -30,7 +36,7 @@ Open http://localhost:3000.
 
 ## Upload to GitHub
 
-1. Open your repository: `https://github.com/Manasmallik09/Mechanical-job-automation-`
+1. Open your repository: `https://github.com/Manasmallik09/Mechanical-job-automation`
 2. Select **Add file → Upload files**.
 3. Extract the downloaded ZIP on your computer.
 4. Upload the contents of the `mechanical-job-dashboard` folder (not the enclosing folder) to the repository root.
