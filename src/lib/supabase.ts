@@ -1,3 +1,4 @@
+-- 1. Discovered & Manual Mechanical Engineering Jobs
 create table if not exists public.jobs (
   id uuid primary key default gen_random_uuid(),
   external_job_id text unique not null,
@@ -17,6 +18,7 @@ create table if not exists public.jobs (
   created_at timestamptz default now()
 );
 
+-- 2. Scheduled Automation Run Logs (08:00 AM & 07:00 PM IST)
 create table if not exists public.automation_runs (
   id uuid primary key default gen_random_uuid(),
   run_slot text not null,
@@ -26,11 +28,24 @@ create table if not exists public.automation_runs (
   ran_at timestamptz default now()
 );
 
+-- 3. Indexes for Fast Dashboard Filtering & Sorting
+create index if not exists idx_jobs_match_score on public.jobs (match_score desc);
+create index if not exists idx_jobs_status on public.jobs (status);
+create index if not exists idx_automation_runs_ran_at on public.automation_runs (ran_at desc);
+
+-- 4. Enable Row-Level Security (RLS)
 alter table public.jobs enable row level security;
 alter table public.automation_runs enable row level security;
 
--- Allow dashboard read and status/insert operations
+-- 5. Safe Re-Runnable RLS Policies
+drop policy if exists "Public read jobs" on public.jobs;
 create policy "Public read jobs" on public.jobs for select using (true);
+
+drop policy if exists "Public insert jobs" on public.jobs;
 create policy "Public insert jobs" on public.jobs for insert with check (true);
+
+drop policy if exists "Public update jobs" on public.jobs;
 create policy "Public update jobs" on public.jobs for update using (true);
+
+drop policy if exists "Public read runs" on public.automation_runs;
 create policy "Public read runs" on public.automation_runs for select using (true);
