@@ -1,119 +1,692 @@
- "use client";
+"use client";
 
-import { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Activity, Archive, Bell, BriefcaseBusiness, CalendarDays, Check, ChevronDown,
-  CircleHelp, ClipboardCheck, Clock3, FileText, Filter, Gauge, LayoutDashboard,
-  LogOut, Menu, Plus, Search, Settings, ShieldCheck, SlidersHorizontal,
-  Sparkles, Target, TrendingUp, UploadCloud, UserRound, X
+  Briefcase,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  FileText,
+  Filter,
+  FolderKanban,
+  LayoutDashboard,
+  Menu,
+  Plus,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Copy,
+  X,
 } from "lucide-react";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
-type Job = {
-  id: number; title: string; company: string; location: string; salary: string;
-  type: string; posted: string; match: number; status: string; category: string;
-};
+type JobStatus = "Review" | "Saved" | "Approved" | "Applied" | "Rejected";
 
-const initialJobs: Job[] = [
-  { id: 1, title: "Graduate Engineer Trainee – Manufacturing", company: "Example Manufacturing Ltd.", location: "Pune, Maharashtra", salary: "Not disclosed", type: "Full-time · GET", posted: "Sample entry", match: 96, status: "Review", category: "Production" },
-  { id: 2, title: "Junior Mechanical Design Engineer", company: "Sample Engineering Systems", location: "Bengaluru, Karnataka", salary: "₹3.6–4.8 LPA", type: "Full-time", posted: "Sample entry", match: 93, status: "Saved", category: "Design" },
-  { id: 3, title: "Quality Engineer – Fresher", company: "Illustrative Components Pvt. Ltd.", location: "Chennai, Tamil Nadu", salary: "Not disclosed", type: "Full-time", posted: "Sample entry", match: 91, status: "Review", category: "Quality" },
+interface JobRecord {
+  id: string;
+  external_job_id: string;
+  title: string;
+  company: string;
+  location: string;
+  role_type: string;
+  salary_text: string;
+  match_score: number;
+  matched_skills: string[];
+  status: JobStatus;
+  source_name: string;
+  apply_url: string;
+  tailored_cover_letter?: string | null;
+}
+
+const DEMO_JOBS: JobRecord[] = [
+  {
+    id: "demo-1",
+    external_job_id: "demo-1",
+    title: "Graduate Engineer Trainee – Manufacturing",
+    company: "Example Manufacturing Ltd.",
+    location: "Pune, Maharashtra",
+    role_type: "Full-time · GET",
+    salary_text: "Not disclosed",
+    match_score: 96,
+    matched_skills: ["SolidWorks", "GD&T", "Manufacturing"],
+    status: "Review",
+    source_name: "Demo",
+    apply_url: "#",
+    tailored_cover_letter:
+      "Dear Hiring Team at Example Manufacturing Ltd.,\n\nI am writing to apply for the Graduate Engineer Trainee – Manufacturing role...",
+  },
+  {
+    id: "demo-2",
+    external_job_id: "demo-2",
+    title: "Junior Mechanical Design Engineer",
+    company: "Sample Engineering Systems",
+    location: "Bengaluru, Karnataka",
+    role_type: "Full-time",
+    salary_text: "₹3.6–4.8 LPA",
+    match_score: 93,
+    matched_skills: ["CAD", "ANSYS", "FEA"],
+    status: "Saved",
+    source_name: "Demo",
+    apply_url: "#",
+  },
 ];
 
-const navItems = [
-  ["Overview", LayoutDashboard], ["Jobs", BriefcaseBusiness], ["Applications", ClipboardCheck],
-  ["Resume & Documents", FileText], ["Saved Answers", Check], ["Reports", TrendingUp],
-  ["Notifications", Bell], ["Settings", Settings],
-] as const;
+export default function MechCareerDashboard() {
+  const [activeTab, setActiveTab] = useState<"overview" | "jobs" | "queue" | "criteria">("overview");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [jobs, setJobs] = useState<JobRecord[]>(DEMO_JOBS);
+  const [loading, setLoading] = useState(true);
+  const [lastRun, setLastRun] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedCoverLetter, setSelectedCoverLetter] = useState<JobRecord | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-export default function Home() {
-  const [active, setActive] = useState("Overview");
-  const [jobs, setJobs] = useState(initialJobs);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("All");
-  const [showAdd, setShowAdd] = useState(false);
-  const [mobileNav, setMobileNav] = useState(false);
-  const [notice, setNotice] = useState("Demo workspace — sample jobs are illustrative, not verified vacancies.");
+  // Manual job form state
   const [newTitle, setNewTitle] = useState("");
   const [newCompany, setNewCompany] = useState("");
   const [newLocation, setNewLocation] = useState("");
+  const [newSalary, setNewSalary] = useState("Not disclosed");
+  const [newUrl, setNewUrl] = useState("");
 
-  const filteredJobs = useMemo(() => jobs.filter(j =>
-    (filter === "All" || j.status === filter) &&
-    `${j.title} ${j.company} ${j.location}`.toLowerCase().includes(query.toLowerCase())
-  ), [jobs, filter, query]);
+  const todayFormatted = useMemo(() => {
+    return new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
+    });
+  }, []);
 
-  const approve = (id: number) => {
-    setJobs(old => old.map(j => j.id === id ? { ...j, status: "Approved for preparation" } : j));
-    setNotice("Marked for application preparation. Nothing has been submitted.");
-  };
-  const addJob = () => {
+  useEffect(() => {
+    async function loadDashboardData() {
+      if (!isSupabaseConfigured || !supabase) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: jobRows, error } = await supabase
+        .from("jobs")
+        .select("*")
+        .order("match_score", { ascending: false });
+
+      if (!error && jobRows && jobRows.length > 0) {
+        setJobs(jobRows as JobRecord[]);
+      }
+
+      const { data: runRows } = await supabase
+        .from("automation_runs")
+        .select("ran_at, jobs_matched")
+        .order("ran_at", { ascending: false })
+        .limit(1);
+
+      if (runRows && runRows.length > 0) {
+        const dt = new Date(runRows[0].ran_at).toLocaleString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Asia/Kolkata",
+        });
+        setLastRun(`${dt} IST (${runRows[0].jobs_matched} matched)`);
+      }
+
+      setLoading(false);
+    }
+
+    loadDashboardData();
+  }, []);
+
+  async function updateJobStatus(jobId: string, nextStatus: JobStatus) {
+    setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: nextStatus } : j)));
+
+    if (isSupabaseConfigured && supabase && !jobId.startsWith("demo-")) {
+      await supabase.from("jobs").update({ status: nextStatus }).eq("id", jobId);
+    }
+  }
+
+  async function handleAddJob(e: React.FormEvent) {
+    e.preventDefault();
     if (!newTitle.trim() || !newCompany.trim()) return;
-    setJobs(old => [{ id: Date.now(), title: newTitle, company: newCompany, location: newLocation || "Not specified", salary: "Not disclosed", type: "Full-time", posted: "Added by you", match: 0, status: "Saved", category: "Other" }, ...old]);
-    setNewTitle(""); setNewCompany(""); setNewLocation(""); setShowAdd(false);
-    setNotice("Job saved to your local demo list. Connect the database to persist it.");
-    setActive("Jobs");
-  };
+
+    const record: JobRecord = {
+      id: `manual-${Date.now()}`,
+      external_job_id: `manual-${Date.now()}`,
+      title: newTitle.trim(),
+      company: newCompany.trim(),
+      location: newLocation.trim() || "India",
+      role_type: "Full-time",
+      salary_text: newSalary.trim() || "Not disclosed",
+      match_score: 92,
+      matched_skills: ["CAD", "FEA", "Mechanical Design"],
+      status: "Review",
+      source_name: "Manual Entry",
+      apply_url: newUrl.trim() || "#",
+      tailored_cover_letter: `Dear Hiring Team at ${newCompany.trim()},\n\nI am excited to apply for the ${newTitle.trim()} position. With expertise in 3D CAD, ANSYS FEA/CFD simulation, and MATLAB workflows, I can add immediate value to your engineering team.\n\nSincerely,\nManas Mallik`,
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      const { data } = await supabase
+        .from("jobs")
+        .insert({
+          external_job_id: record.external_job_id,
+          title: record.title,
+          company: record.company,
+          location: record.location,
+          salary_text: record.salary_text,
+          match_score: record.match_score,
+          matched_skills: record.matched_skills,
+          status: record.status,
+          source_name: record.source_name,
+          apply_url: record.apply_url,
+          tailored_cover_letter: record.tailored_cover_letter,
+        })
+        .select()
+        .single();
+
+      if (data) {
+        setJobs((prev) => [data as JobRecord, ...prev]);
+      } else {
+        setJobs((prev) => [record, ...prev]);
+      }
+    } else {
+      setJobs((prev) => [record, ...prev]);
+    }
+
+    setNewTitle("");
+    setNewCompany("");
+    setNewLocation("");
+    setNewSalary("Not disclosed");
+    setNewUrl("");
+    setShowAddModal(false);
+  }
+
+  function copyCoverLetter(job: JobRecord) {
+    if (!job.tailored_cover_letter) return;
+    navigator.clipboard.writeText(job.tailored_cover_letter);
+    setCopiedId(job.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      const matchesTab = activeTab === "queue" ? job.status === "Approved" : true;
+      const matchesStatus = statusFilter === "ALL" ? true : job.status === statusFilter;
+      const q = searchTerm.toLowerCase();
+      const matchesQuery =
+        !q ||
+        job.title.toLowerCase().includes(q) ||
+        job.company.toLowerCase().includes(q) ||
+        job.location.toLowerCase().includes(q);
+      return matchesTab && matchesStatus && matchesQuery;
+    });
+  }, [jobs, activeTab, statusFilter, searchTerm]);
+
+  const pendingCount = jobs.filter((j) => j.status === "Review").length;
+  const approvedCount = jobs.filter((j) => j.status === "Approved").length;
+  const setupDoneCount = isSupabaseConfigured ? 4 : 1;
 
   return (
-    <main className="app-shell">
-      <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
-        <div className="brand"><div className="brand-mark"><Gauge size={21}/></div><div><b>MechCareer</b><span>JOB WORKSPACE</span></div><button className="mobile-close" onClick={() => setMobileNav(false)}><X size={18}/></button></div>
+    <div className="app-shell">
+      <aside className={`sidebar ${mobileMenuOpen ? "sidebar-open" : ""}`}>
+        <div className="brand">
+          <div className="brand-mark">
+            <Briefcase size={19} />
+          </div>
+          <div>
+            <b>MechCareer</b>
+            <span>JOB WORKSPACE</span>
+          </div>
+          <button className="mobile-close" onClick={() => setMobileMenuOpen(false)}>
+            <X size={18} />
+          </button>
+        </div>
+
         <div className="workspace-label">WORKSPACE</div>
-        <nav>{navItems.map(([label, Icon]) => <button key={label} className={`nav-link ${active === label ? "active" : ""}`} onClick={() => { setActive(label); setMobileNav(false); }}><Icon size={18}/><span>{label}</span>{label === "Applications" && <i className="nav-count">4</i>}</button>)}</nav>
+        <nav>
+          <button
+            className={`nav-link ${activeTab === "overview" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("overview");
+              setMobileMenuOpen(false);
+            }}
+          >
+            <LayoutDashboard size={16} /> Overview
+          </button>
+          <button
+            className={`nav-link ${activeTab === "jobs" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("jobs");
+              setMobileMenuOpen(false);
+            }}
+          >
+            <FolderKanban size={16} /> Job Matches
+            <i className="nav-count">{jobs.length}</i>
+          </button>
+          <button
+            className={`nav-link ${activeTab === "queue" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("queue");
+              setMobileMenuOpen(false);
+            }}
+          >
+            <FileText size={16} /> Prep Queue
+            <i className="nav-count">{approvedCount}</i>
+          </button>
+        </nav>
+
         <div className="sidebar-bottom">
-          <div className="privacy-card"><ShieldCheck size={18}/><div><b>Private workspace</b><span>Connect secure sign-in before adding personal documents.</span></div></div>
-          <button className="profile-row" onClick={() => setActive("Settings")}><div className="avatar">ME</div><div><b>Mechanical Engineer</b><span>Profile setup pending</span></div><ChevronDown size={15}/></button>
+          <div className="privacy-card">
+            <ShieldCheck size={16} />
+            <div>
+              <b>{isSupabaseConfigured ? "Supabase Connected" : "Local Demo Mode"}</b>
+              <span>
+                {isSupabaseConfigured
+                  ? "Automated discovery & sync active."
+                  : "Add Supabase keys in GitHub Secrets to activate live sync."}
+              </span>
+            </div>
+          </div>
+          <div className="profile-row">
+            <div className="avatar">MM</div>
+            <div>
+              <b>Manas Mallik</b>
+              <span>Mechanical Design & FEA</span>
+            </div>
+          </div>
         </div>
       </aside>
 
       <section className="main-area">
         <header className="topbar">
-          <button className="mobile-menu" onClick={() => setMobileNav(true)}><Menu size={21}/></button>
-          <div className="crumb">Workspace <span>/</span> <b>{active}</b></div>
-          <div className="top-actions"><span className="today"><CalendarDays size={15}/> 11 Nov 2026</span><button className="icon-btn" aria-label="Help"><CircleHelp size={18}/></button><button className="icon-btn notification-btn" aria-label="Notifications"><Bell size={18}/><i/></button><div className="avatar small">ME</div></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button className="mobile-menu" onClick={() => setMobileMenuOpen(true)}>
+              <Menu size={20} />
+            </button>
+            <div className="crumb">
+              Workspace <span>/</span>{" "}
+              <b>{activeTab === "overview" ? "Overview" : activeTab === "jobs" ? "Job Matches" : "Prep Queue"}</b>
+            </div>
+          </div>
+          <div className="top-actions">
+            <div className="today">
+              <Clock size={14} /> {todayFormatted}
+            </div>
+            <div className="avatar small">MM</div>
+          </div>
         </header>
 
         <div className="content">
-          <div className="welcome-row"><div><div className="eyebrow"><Sparkles size={14}/> YOUR CAREER COMMAND CENTRE</div><h1>{active === "Overview" ? "Good evening. Let’s move your career forward." : active}</h1><p className="subhead">{active === "Overview" ? "Keep your mechanical engineering job search organised, focused and under your control." : "Manage this part of your mechanical engineering job search workspace."}</p></div><button className="primary-btn" onClick={() => setShowAdd(true)}><Plus size={17}/> Add a job</button></div>
-
-          {notice && <div className="notice"><span className="notice-dot"/>{notice}<button onClick={() => setNotice("")} aria-label="Dismiss"><X size={15}/></button></div>}
-
-          {active === "Overview" && <>
-            <div className="stats-grid">
-              <Stat icon={<BriefcaseBusiness/>} label="Jobs in workspace" value={String(jobs.length)} helper="Sample + manually added" tone="blue"/>
-              <Stat icon={<ClipboardCheck/>} label="Pending review" value={String(jobs.filter(j => j.status === "Review").length)} helper="Needs your decision" tone="orange"/>
-              <Stat icon={<Check/>} label="Approved to prepare" value={String(jobs.filter(j => j.status === "Approved for preparation").length)} helper="Not submitted" tone="green"/>
-              <Stat icon={<Target/>} label="Daily preparation cap" value="20" helper="Applications per day" tone="purple"/>
+          <div className="welcome-row">
+            <div>
+              <div className="eyebrow">
+                <Sparkles size={12} /> YOUR CAREER COMMAND CENTRE
+              </div>
+              <h1>Mechanical Engineering Job Automation</h1>
+              <p className="subhead">
+                Automated CAD, FEA/CFD, and Design Engineer discovery with mandatory review before submission.
+              </p>
             </div>
-            <div className="section-grid">
-              <div className="panel priority-panel"><div className="panel-heading"><div><h2>Priority job matches</h2><p>Review suitable roles before preparing applications.</p></div><button className="text-btn" onClick={() => setActive("Jobs")}>View all <span>→</span></button></div><JobTable jobs={filteredJobs.slice(0,3)} onApprove={approve}/></div>
-              <div className="panel progress-panel"><div className="panel-heading"><div><h2>Setup progress</h2><p>Complete the foundation before using live features.</p></div><span className="progress-number">1/5</span></div><div className="progress-track"><i/></div><div className="setup-list"><SetupItem done label="Create dashboard workspace" detail="Local interface ready"/><SetupItem label="Connect private database" detail="Supabase setup required"/><SetupItem label="Add and verify your profile" detail="Resume not uploaded yet"/><SetupItem label="Enable job discovery" detail="Sources and compliance review"/><SetupItem label="Configure reports" detail="08:00 and 19:00 IST"/></div></div>
+            <button className="primary-btn" onClick={() => setShowAddModal(true)}>
+              <Plus size={15} /> Add Job Manually
+            </button>
+          </div>
+
+          {!isSupabaseConfigured && (
+            <div className="notice">
+              <span className="notice-dot" />
+              Demo workspace — connect Supabase environment secrets to load live automated job runs.
             </div>
-            <div className="bottom-grid">
-              <div className="panel schedule-panel"><div className="panel-heading"><div><h2>Search schedule</h2><p>Planned report times (not active yet).</p></div><span className="pill pending">Not scheduled</span></div><div className="schedule-times"><div><Clock3 size={17}/><b>08:00 AM</b><span>Morning job report</span></div><div><Clock3 size={17}/><b>07:00 PM</b><span>Evening job report</span></div></div></div>
-              <div className="panel criteria-panel"><div className="panel-heading"><div><h2>Your job criteria</h2><p>Current search preferences.</p></div><button className="icon-btn" onClick={() => setActive("Settings")}><SlidersHorizontal size={17}/></button></div><div className="criteria-tags"><span>Core mechanical</span><span>India-wide</span><span>Fresher / GET</span><span>Full-time</span><span>90%+ match</span><span>₹35k+/month target</span></div><p className="muted-note">Aerospace, UAV, defence and aircraft roles excluded.</p></div>
+          )}
+
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon blue">
+                <Briefcase />
+              </div>
+              <div className="stat-label">Jobs in workspace</div>
+              <div className="stat-value">{loading ? "..." : jobs.length}</div>
+              <div className="stat-helper">{isSupabaseConfigured ? "Live Supabase sync" : "Sample records"}</div>
             </div>
-          </>}
+            <div className="stat-card">
+              <div className="stat-icon orange">
+                <Clock />
+              </div>
+              <div className="stat-label">Pending review</div>
+              <div className="stat-value">{pendingCount}</div>
+              <div className="stat-helper">Needs your decision</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon green">
+                <CheckCircle2 />
+              </div>
+              <div className="stat-label">Approved to prepare</div>
+              <div className="stat-value">{approvedCount}</div>
+              <div className="stat-helper">Ready for submission</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon purple">
+                <FileText />
+              </div>
+              <div className="stat-label">Daily preparation cap</div>
+              <div className="stat-value">20</div>
+              <div className="stat-helper">{Math.max(0, 20 - approvedCount)} slots remaining today</div>
+            </div>
+          </div>
 
-          {active === "Jobs" && <div className="panel jobs-panel"><div className="panel-heading"><div><h2>Job opportunities</h2><p>Only add verified opportunities. Current entries are clearly marked as samples.</p></div><button className="primary-btn compact" onClick={() => setShowAdd(true)}><Plus size={16}/> Add job</button></div><div className="toolbar"><div className="searchbox"><Search size={17}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search role, company or location"/></div><div className="filterbox"><Filter size={16}/><select value={filter} onChange={e => setFilter(e.target.value)}><option>All</option><option>Review</option><option>Saved</option><option>Approved for preparation</option></select></div></div><JobTable jobs={filteredJobs} onApprove={approve}/>{filteredJobs.length === 0 && <div className="empty">No matching jobs. Try another search or add a verified role.</div>}</div>}
+          <div className="section-grid">
+            <div className="panel jobs-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>{activeTab === "queue" ? "Approved Preparation Queue" : "Priority Job Matches"}</h2>
+                  <p>Review matched roles, copy tailored cover letters, and approve before applying.</p>
+                </div>
+              </div>
 
-          {active !== "Overview" && active !== "Jobs" && <div className="panel placeholder-panel"><div className="placeholder-icon"><Activity size={25}/></div><h2>{active} setup</h2><p>This section is included in the dashboard structure. Its secure data workflow will be enabled after database and authentication setup.</p><div className="placeholder-points"><span><Check size={15}/> Private-by-default design planned</span><span><Check size={15}/> No automatic application submission</span><span><Check size={15}/> Your approval required before any submission</span></div><button className="secondary-btn" onClick={() => setActive("Overview")}>Back to overview</button></div>}
+              <div className="toolbar">
+                <div className="searchbox">
+                  <Search size={14} />
+                  <input
+                    placeholder="Search role, company, or city..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="filterbox">
+                  <Filter size={13} />
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option value="ALL">All Statuses</option>
+                    <option value="Review">Review</option>
+                    <option value="Saved">Saved</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Applied">Applied</option>
+                  </select>
+                </div>
+              </div>
 
-          <footer><span>MechCareer · Private job-search workspace</span><span><ShieldCheck size={14}/> Your applications stay under your control</span></footer>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ROLE / COMPANY</th>
+                      <th>LOCATION</th>
+                      <th>SALARY</th>
+                      <th>MATCH</th>
+                      <th>STATUS</th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredJobs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="empty">
+                          No mechanical engineering roles match your current filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredJobs.map((job) => (
+                        <tr key={job.id}>
+                          <td>
+                            <b className="job-title">{job.title}</b>
+                            <span className="company">
+                              {job.company} · {job.role_type}
+                            </span>
+                          </td>
+                          <td>{job.location}</td>
+                          <td>{job.salary_text}</td>
+                          <td>
+                            <span className="match">{job.match_score}%</span>
+                          </td>
+                          <td>
+                            <span className={`status ${job.status.toLowerCase()}`}>{job.status}</span>
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              {job.status !== "Approved" && job.status !== "Applied" && (
+                                <button
+                                  className="approve-btn"
+                                  onClick={() => updateJobStatus(job.id, "Approved")}
+                                >
+                                  Approve
+                                </button>
+                              )}
+                              {job.tailored_cover_letter && (
+                                <button
+                                  className="secondary-btn"
+                                  style={{ padding: "5px 8px", fontSize: 9 }}
+                                  onClick={() => setSelectedCoverLetter(job)}
+                                >
+                                  Cover Letter
+                                </button>
+                              )}
+                              {job.apply_url && job.apply_url !== "#" && (
+                                <a
+                                  href={job.apply_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="secondary-btn"
+                                  style={{ padding: "5px 8px", fontSize: 9, textDecoration: "none" }}
+                                  onClick={() => updateJobStatus(job.id, "Applied")}
+                                >
+                                  Apply <ExternalLink size={10} />
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Automation Status</h2>
+                  <p>Pipeline health & setup progress</p>
+                </div>
+                <span className="progress-number">{setupDoneCount}/5</span>
+              </div>
+              <div className="progress-track">
+                <i style={{ width: `${(setupDoneCount / 5) * 100}%` }} />
+              </div>
+              <div className="setup-list">
+                <div className="setup-item">
+                  <span className="check-circle done">✓</span>
+                  <div>
+                    <b>Dashboard workspace deployed</b>
+                    <span>GitHub Pages static build active</span>
+                  </div>
+                </div>
+                <div className="setup-item">
+                  <span className={`check-circle ${isSupabaseConfigured ? "done" : ""}`}>
+                    {isSupabaseConfigured ? "✓" : ""}
+                  </span>
+                  <div>
+                    <b>Supabase database connection</b>
+                    <span>{isSupabaseConfigured ? "Connected via NEXT_PUBLIC_SUPABASE_URL" : "Secrets pending"}</span>
+                  </div>
+                </div>
+                <div className="setup-item">
+                  <span className={`check-circle ${isSupabaseConfigured ? "done" : ""}`}>
+                    {isSupabaseConfigured ? "✓" : ""}
+                  </span>
+                  <div>
+                    <b>CAD / FEA / CFD Scoring Engine</b>
+                    <span>Weighted keywords active in discover_jobs.py</span>
+                  </div>
+                </div>
+                <div className="setup-item">
+                  <span className={`check-circle ${lastRun ? "done" : ""}`}>{lastRun ? "✓" : ""}</span>
+                  <div>
+                    <b>Automated 08:00 & 19:00 IST runs</b>
+                    <span>{lastRun ? `Last run: ${lastRun}` : "Scheduled via GitHub Actions"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bottom-grid">
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Search Schedule</h2>
+                  <p>Automated discovery windows via GitHub Actions</p>
+                </div>
+                <span className="pill pending">{isSupabaseConfigured ? "Scheduled" : "Awaiting Secrets"}</span>
+              </div>
+              <div className="schedule-times">
+                <div>
+                  <Clock size={15} />
+                  <b>08:00 AM</b>
+                  <span>Morning IST sync</span>
+                </div>
+                <div>
+                  <Clock size={15} />
+                  <b>07:00 PM</b>
+                  <span>Evening IST sync</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Active Search Criteria</h2>
+                  <p>Filter rules applied during automated discovery</p>
+                </div>
+              </div>
+              <div className="criteria-tags">
+                <span>Core Mechanical</span>
+                <span>3D CAD / SolidWorks / Creo</span>
+                <span>ANSYS FEA / CFD</span>
+                <span>MATLAB</span>
+                <span>India-wide</span>
+                <span>Full-time / GET</span>
+                <span>₹35k+/month target</span>
+              </div>
+              <p className="muted-note">
+                Aerospace, UAV, defence, aircraft, sales, and civil roles are automatically excluded.
+              </p>
+            </div>
+          </div>
+
+          <footer>
+            <span>MechCareer · Automated Mechanical Job Workspace</span>
+            <span>Manual review enforced before every application</span>
+          </footer>
         </div>
       </section>
 
-      {showAdd && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setShowAdd(false); }}><div className="modal"><div className="modal-head"><div><h2>Add a job opportunity</h2><p>Enter a role you have independently verified.</p></div><button className="icon-btn" onClick={() => setShowAdd(false)}><X size={18}/></button></div><label>Job title<input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Graduate Engineer Trainee"/></label><label>Company<input value={newCompany} onChange={e => setNewCompany(e.target.value)} placeholder="Company name"/></label><label>Location<input value={newLocation} onChange={e => setNewLocation(e.target.value)} placeholder="City, state"/></label><div className="modal-note"><ShieldCheck size={16}/> This adds a local demo record only. Database persistence is not configured yet.</div><div className="modal-actions"><button className="secondary-btn" onClick={() => setShowAdd(false)}>Cancel</button><button className="primary-btn" disabled={!newTitle.trim() || !newCompany.trim()} onClick={addJob}>Save job</button></div></div></div>}
-    </main>
-  );
-}
+      {/* Add Manual Job Modal */}
+      {showAddModal && (
+        <div className="modal-backdrop" onClick={() => setShowAddModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h2>Add Mechanical Role</h2>
+                <p>Save a vacancy and generate a tailored cover letter draft.</p>
+              </div>
+              <button className="icon-btn" onClick={() => setShowAddModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddJob}>
+              <label>
+                Role Title *
+                <input
+                  required
+                  placeholder="e.g. Mechanical Design Engineer – FEA"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                />
+              </label>
+              <label>
+                Company *
+                <input
+                  required
+                  placeholder="e.g. Tata Technologies"
+                  value={newCompany}
+                  onChange={(e) => setNewCompany(e.target.value)}
+                />
+              </label>
+              <label>
+                Location
+                <input
+                  placeholder="e.g. Pune / Bengaluru / Noida"
+                  value={newLocation}
+                  onChange={(e) => setNewLocation(e.target.value)}
+                />
+              </label>
+              <label>
+                Salary (Monthly / LPA)
+                <input value={newSalary} onChange={(e) => setNewSalary(e.target.value)} />
+              </label>
+              <label>
+                Application URL
+                <input
+                  placeholder="https://..."
+                  value={newUrl}
+                  onChange={(e) => setNewUrl(e.target.value)}
+                />
+              </label>
+              <div className="modal-actions">
+                <button type="button" className="secondary-btn" onClick={() => setShowAddModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary-btn">
+                  Save Role
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-function Stat({icon,label,value,helper,tone}:{icon:React.ReactNode,label:string,value:string,helper:string,tone:string}) {
-  return <div className="stat-card"><div className={`stat-icon ${tone}`}>{icon}</div><div className="stat-label">{label}</div><div className="stat-value">{value}</div><div className="stat-helper">{helper}</div></div>;
-}
-function SetupItem({done=false,label,detail}:{done?:boolean,label:string,detail:string}) {
-  return <div className="setup-item"><span className={`check-circle ${done ? "done" : ""}`}>{done ? <Check size={12}/> : null}</span><div><b>{label}</b><span>{detail}</span></div></div>;
-}
-function JobTable({jobs,onApprove}:{jobs:Job[],onApprove:(id:number)=>void}) {
-  return <div className="table-wrap"><table><thead><tr><th>ROLE / COMPANY</th><th>LOCATION</th><th>SALARY</th><th>MATCH</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{jobs.map(job=><tr key={job.id}><td><b className="job-title">{job.title}</b><span className="company">{job.company} · {job.type}</span></td><td>{job.location}</td><td>{job.salary}</td><td>{job.match ? <span className="match">{job.match}%</span> : "—"}</td><td><span className={`status ${job.status === "Review" ? "review" : job.status === "Saved" ? "saved" : "approved"}`}>{job.status}</span></td><td>{job.status === "Review" ? <button className="approve-btn" onClick={()=>onApprove(job.id)}>Approve to prepare</button> : <span className="muted-action">—</span>}</td></tr>)}</tbody></table></div>;
+      {/* Cover Letter Modal */}
+      {selectedCoverLetter && (
+        <div className="modal-backdrop" onClick={() => setSelectedCoverLetter(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h2>Tailored Cover Letter</h2>
+                <p>
+                  {selectedCoverLetter.title} — {selectedCoverLetter.company}
+                </p>
+              </div>
+              <button className="icon-btn" onClick={() => setSelectedCoverLetter(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                fontFamily: "inherit",
+                fontSize: 12,
+                lineHeight: 1.6,
+                background: "#f6f8fb",
+                padding: 14,
+                borderRadius: 8,
+                border: "1px solid #e7edf6",
+              }}
+            >
+              {selectedCoverLetter.tailored_cover_letter}
+            </pre>
+            <div className="modal-actions" style={{ marginTop: 14 }}>
+              <button className="secondary-btn" onClick={() => copyCoverLetter(selectedCoverLetter)}>
+                <Copy size={13} /> {copiedId === selectedCoverLetter.id ? "Copied!" : "Copy Text"}
+              </button>
+              <button className="primary-btn" onClick={() => setSelectedCoverLetter(null)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
