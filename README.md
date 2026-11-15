@@ -1,78 +1,49 @@
-# MechCareer — Mechanical Job Application Dashboard
+# MechCareer — Local Mechanical Job Workspace
 
-A mobile-friendly private-workspace starter for organising a mechanical engineering job search.
+A local-first mechanical engineering job tracker using **Python's standard library and SQLite**. No Supabase, Firebase, Vercel, cloud database, API keys, paid services, npm packages or internet connection are needed to run it after Python is installed.
 
-## Current state
+## Features
+- Dashboard with job, review, application and interview counts.
+- Add, edit, search, filter and delete job records.
+- Track Saved, Shortlisted, Preparing, Applied, Interview, Rejected and Closed stages.
+- Store role, company, location, salary, source, official application URL, dates and notes.
+- Save search preferences in SQLite.
+- Export records to CSV and keep a local activity history.
+- No fabricated vacancy listings or invented match scores.
+- No automatic application submission; you open the employer page and submit personally.
 
-This repository contains a Next.js dashboard configured for static export and GitHub Pages. It is **not yet a live job-search or application automation service**.
+## Run on Windows
+1. Install Python 3.10 or newer from https://www.python.org/downloads/ and enable Add Python to PATH.
+2. Download this repository as a ZIP and extract it, or clone it with Git.
+3. Open the extracted project folder.
+4. Double-click start.bat, or run this command in Command Prompt:
 
-- The included job rows are illustrative sample records, not verified vacancies.
-- Adding a job currently stores it in browser memory only; it is not persisted.
-- Authentication, database connection, private file storage, live job discovery and scheduled reports are not enabled yet.
-- No job application is submitted automatically. User approval must remain mandatory.
-- Do not upload a resume, certificates, photograph, or other personal documents until authentication and private storage policies have been configured and tested.
+       py -3 server.py
 
-## Requirements
+5. Open http://127.0.0.1:8765 if it does not open automatically.
+6. Press Ctrl+C in the terminal to stop the app.
 
-- Node.js 20.9 or newer
-- npm
-- A GitHub repository
-- Optional later: Supabase project and Vercel account
+## Database and privacy
+- SQLite database: data/mechcareer.sqlite3
+- The data folder is created automatically on first run.
+- Server binds only to 127.0.0.1, not your Wi-Fi/network interface.
+- App makes no external network requests; records stay on this computer.
+- Back up the data folder regularly. Use Export jobs CSV for a portable copy.
+- Never commit your database, CV, certificates or personal documents to this public repository.
 
-## GitHub Pages deployment
+## Default job-search preferences
+- India-wide, full-time and Graduate Engineer Trainee opportunities.
+- Core mechanical roles: design, manufacturing, production, quality, maintenance, FEA, CFD and R&D.
+- ₹35,000/month salary target.
+- Exclude aerospace, UAV, defence and aircraft roles.
 
-The project is configured to export static files to `out/` with the project-site base path `/Mechanical-job-automation`. The workflow at `.github/workflows/deploy.yml` builds and deploys the site whenever `main` is updated.
+Preferences can be edited in the dashboard. This offline version does not scrape job portals or verify live vacancies. Add vacancies only after checking the employer's official careers page. Opening an external job URL needs internet access.
 
-In **Settings → Pages**, set **Source** to **GitHub Actions**. Then check the Actions tab for the first successful deployment. The published URL is `https://manasmallik09.github.io/Mechanical-job-automation/`.
+## Architecture note
+This is a local Python web application, not a static GitHub Pages site. GitHub Pages cannot run a Python server or host a writable SQLite database. GitHub stores the source code; the app and database run on your Windows computer. Do not configure a Pages deployment for this local-only version.
 
-## Run locally
-
-```bash
-npm install
-npm run dev
-```
-
-Open http://localhost:3000.
-
-## Upload to GitHub
-
-1. Open your repository: `https://github.com/Manasmallik09/Mechanical-job-automation`
-2. Select **Add file → Upload files**.
-3. Extract the downloaded ZIP on your computer.
-4. Upload the contents of the `mechanical-job-dashboard` folder (not the enclosing folder) to the repository root.
-5. Commit to the `main` branch with message `Add MechCareer dashboard starter`.
-
-If GitHub's browser upload is easier, use your Windows PC. Never upload `.env.local`, passwords, API keys, resumes or private documents to this public repository.
-
-## Supabase setup — later phase
-
-1. Create a Supabase project.
-2. Copy the project URL and anon/public key into a local `.env.local` file using `.env.example` as a template.
-3. In Supabase SQL Editor, review and run `supabase/schema.sql`.
-4. Configure email/password authentication.
-5. Create a private Storage bucket named `private-documents`, then add and test owner-only policies before uploading files.
-6. Add server-side authentication and protected routes before deploying a private production dashboard.
-
-The SQL schema uses row-level security for user-owned records. It does not by itself implement login, route protection, or secure document upload.
-
-## Job-search rules to preserve
-
-- India-wide, full-time and Graduate Engineer Trainee roles.
-- Core mechanical engineering roles; exclude aerospace, UAV, defence and aircraft roles.
-- ₹35,000/month is the target minimum. If salary is undisclosed, label it undisclosed rather than assuming it meets the target.
-- Prioritise 90%+ profile matches and opportunities posted within the last 30 days.
-- Prepare up to 20 applications per day for user review.
-- Pause when required profile information is missing. Never invent qualifications or work history.
-- Never bypass CAPTCHA, access controls, or website terms. Use official or permitted sources.
-- Bulk approval is approval to prepare/review, not permission for silent submission.
-
-## Planned phases
-
-1. Secure authentication and private dashboard access.
-2. Verified profile and private document storage.
-3. Compliant job discovery and source verification.
-4. Application preparation queue with explicit user approval.
-5. Scheduled reports at 08:00 and 19:00 IST after a scheduler is configured.
-6. Backups and operational checks within the selected free-tier limits.
-
-Free tiers and product limits can change. Confirm current provider limits before relying on a service for production.
+## Troubleshooting
+- If py is not recognised, reinstall Python with Add Python to PATH enabled and reopen Command Prompt.
+- If port 8765 is busy, set the MECHCAREER_PORT environment variable to 8766, then run py -3 server.py; open http://127.0.0.1:8766.
+- If data seems missing, check data/mechcareer.sqlite3 beside server.py.
+- To back up, stop the app and copy the entire data folder to a safe location.
