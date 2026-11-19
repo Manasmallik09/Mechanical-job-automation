@@ -111,6 +111,9 @@ class Handler(BaseHTTPRequestHandler):
    if not title or not company:return self.js(400,{"error":"Job title and company are required."})
    score=int(v.get("match_score") or 0)
    if not 0<=score<=100:return self.js(400,{"error":"Match score must be 0–100."})
+   status=str(v.get("status") or "Saved")
+   if status not in STATUSES:return self.js(400,{"error":"Invalid application status."})
+   apply_url=clean_http_url(v.get("apply_url",""))
    keys=["location","salary","job_type","source","apply_url","posted_date","deadline"]
    vals=[title,company]+[apply_url if k=="apply_url" else str(v.get(k,"")).strip() for k in keys]+[score,status,str(v.get("notes","")).strip(),stamp(),stamp()]
    with dbopen() as d:
@@ -124,8 +127,13 @@ class Handler(BaseHTTPRequestHandler):
    if len(p)!=3 or p[:2]!=["api","jobs"]:return self.js(404,{"error":"Not found"})
    jid=int(p[2]);v=self.body();allowed={"title","company","location","salary","job_type","source","apply_url","posted_date","deadline","match_score","status","notes"}
    u={k:v[k] for k in v if k in allowed}
+   if "status" in u and str(u["status"]) not in STATUSES:return self.js(400,{"error":"Invalid application status."})
+   if "apply_url" in u:u["apply_url"]=clean_http_url(u["apply_url"])
+   if "match_score" in u:
+    try:u["match_score"]=int(u["match_score"])
+    except (TypeError,ValueError):return self.js(400,{"error":"Match score must be a number from 0 to 100."})
+    if not 0<=u["match_score"]<=100:return self.js(400,{"error":"Match score must be 0–100"})
    if not u:return self.js(400,{"error":"No fields supplied"})
-   if "match_score" in u and not 0<=int(u["match_score"])<=100:return self.js(400,{"error":"Match score must be 0–100"})
    u["updated_at"]=stamp()
    with dbopen() as d:
     old=d.execute("SELECT title,status FROM jobs WHERE id=?",(jid,)).fetchone()
