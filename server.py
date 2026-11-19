@@ -23,6 +23,18 @@ CREATE TABLE IF NOT EXISTS activity(id INTEGER PRIMARY KEY AUTOINCREMENT,job_id 
  action TEXT NOT NULL,detail TEXT DEFAULT '',created_at TEXT NOT NULL,
  FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE SET NULL);
 """
+STATUSES={"Saved","Shortlisted","Preparing","Applied","Interview","Rejected","Closed"}
+def clean_http_url(value):
+ value=str(value or "").strip()
+ if not value:return ""
+ from urllib.parse import urlparse
+ parsed=urlparse(value)
+ if parsed.scheme not in ("http","https") or not parsed.netloc:
+  raise ValueError("Job URL must begin with http:// or https://.")
+ return value
+def safe_csv_cell(value):
+ value="" if value is None else str(value)
+ return "'"+value if value.startswith(("=","+","-","@","\t","\r")) else value
 def stamp(): return datetime.now().astimezone().isoformat(timespec="seconds")
 def dbopen():
  d=sqlite3.connect(DB,timeout=10); d.row_factory=sqlite3.Row
@@ -67,7 +79,7 @@ class Handler(BaseHTTPRequestHandler):
  def log_message(self,fmt,*args): print("%s - %s"%(self.address_string(),fmt%args))
  def send(self,status,body,ctype="application/json; charset=utf-8",extra=None):
   data=body if isinstance(body,bytes) else body.encode("utf-8")
-  self.send_response(status);self.send_header("Content-Type",ctype);self.send_header("Content-Length",str(len(data)));self.send_header("X-Content-Type-Options","nosniff");self.send_header("Cache-Control","no-store")
+  self.send_response(status);self.send_header("Content-Type",ctype);self.send_header("Content-Length",str(len(data)));self.send_header("X-Content-Type-Options","nosniff");self.send_header("X-Frame-Options","DENY");self.send_header("Referrer-Policy","no-referrer");self.send_header("Permissions-Policy","camera=(), microphone=(), geolocation=()");self.send_header("Cache-Control","no-store")
   for k,v in (extra or {}).items():self.send_header(k,v)
   self.end_headers();self.wfile.write(data)
  def js(self,status,obj):self.send(status,json.dumps(obj,ensure_ascii=False))
@@ -89,7 +101,7 @@ class Handler(BaseHTTPRequestHandler):
   if p=="/api/export.csv":
    with dbopen() as d:rows=d.execute("SELECT * FROM jobs ORDER BY id").fetchall()
    out=io.StringIO();w=csv.writer(out);w.writerow(rows[0].keys() if rows else ["id","title","company","location","salary","status"])
-   for r in rows:w.writerow(list(r))
+   for r in rows:w.writerow([safe_csv_cell(x) for x in r])
    return self.send(200,out.getvalue(),"text/csv; charset=utf-8",{"Content-Disposition":'attachment; filename="mechcareer-jobs.csv"'})
   return self.js(404,{"error":"Not found"})
  def do_POST(self):
@@ -99,8 +111,11 @@ class Handler(BaseHTTPRequestHandler):
    if not title or not company:return self.js(400,{"error":"Job title and company are required."})
    score=int(v.get("match_score") or 0)
    if not 0<=score<=100:return self.js(400,{"error":"Match score must be 0–100."})
+   status=str(v.get("status") or "Saved")
+   if status not in STATUSES:return self.js(400,{"error":"Invalid application status."})
+   apply_url=clean_http_url(v.get("apply_url",""))
    keys=["location","salary","job_type","source","apply_url","posted_date","deadline"]
-   vals=[title,company]+[str(v.get(k,"")).strip() for k in keys]+[score,str(v.get("status") or "Saved"),str(v.get("notes","")).strip(),stamp(),stamp()]
+   vals=[title,company]+[apply_url if k=="apply_url" else str(v.get(k,"")).strip() for k in keys]+[score,status,str(v.get("notes","")).strip(),stamp(),stamp()]
    with dbopen() as d:
     cur=d.execute("INSERT INTO jobs(title,company,location,salary,job_type,source,apply_url,posted_date,deadline,match_score,status,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",vals)
     jid=cur.lastrowid;d.execute("INSERT INTO activity(job_id,action,detail,created_at) VALUES(?,?,?,?)",(jid,"Job added",title+" — "+company,stamp()))
@@ -112,8 +127,13 @@ class Handler(BaseHTTPRequestHandler):
    if len(p)!=3 or p[:2]!=["api","jobs"]:return self.js(404,{"error":"Not found"})
    jid=int(p[2]);v=self.body();allowed={"title","company","location","salary","job_type","source","apply_url","posted_date","deadline","match_score","status","notes"}
    u={k:v[k] for k in v if k in allowed}
+   if "status" in u and str(u["status"]) not in STATUSES:return self.js(400,{"error":"Invalid application status."})
+   if "apply_url" in u:u["apply_url"]=clean_http_url(u["apply_url"])
+   if "match_score" in u:
+    try:u["match_score"]=int(u["match_score"])
+    except (TypeError,ValueError):return self.js(400,{"error":"Match score must be a number from 0 to 100."})
+    if not 0<=u["match_score"]<=100:return self.js(400,{"error":"Match score must be 0–100"})
    if not u:return self.js(400,{"error":"No fields supplied"})
-   if "match_score" in u and not 0<=int(u["match_score"])<=100:return self.js(400,{"error":"Match score must be 0–100"})
    u["updated_at"]=stamp()
    with dbopen() as d:
     old=d.execute("SELECT title,status FROM jobs WHERE id=?",(jid,)).fetchone()
