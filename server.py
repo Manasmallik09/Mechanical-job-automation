@@ -34,7 +34,7 @@ def clean_http_url(value):
  return value
 def safe_csv_cell(value):
  value="" if value is None else str(value)
- return "'"+value if value.startswith(("=","+","-","@","\\t","\\r")) else value
+ return "'"+value if value.startswith(("=","+","-","@","\t","\r")) else value
 def stamp(): return datetime.now().astimezone().isoformat(timespec="seconds")
 def dbopen():
  d=sqlite3.connect(DB,timeout=10); d.row_factory=sqlite3.Row
