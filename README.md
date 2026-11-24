@@ -1,54 +1,53 @@
-# MechCareer — Local Mechanical Job Workspace
+# MechCareer — Mechanical Career Workspace
 
-A local-first mechanical engineering job tracker using Python and SQLite, with an optional Playwright browser assistant for preparing employer application forms.
+This repository now brings together two related projects while preserving the existing Python application:
 
-## Current capabilities
-- Dashboard with job, review, application and interview counts.
-- Add, edit, search, filter and delete job records.
-- Track Saved, Shortlisted, Preparing, Applied, Interview, Rejected and Closed stages.
-- Store role, company, location, salary, source, official application URL, dates and notes.
-- Save search preferences in SQLite and export records to CSV.
-- Optional Playwright helper opens an employer application page and fills recognised profile fields for review.
-- The browser helper never clicks Submit, Apply, Save or any final-action button. You review and submit manually.
+1. **GitHub Pages career dashboard** — static browser-based opportunity tracker at the repository root.
+2. **Mechanical design portfolio** — integrated under `/portfolio/`, based on the existing Mechanical-Design-poerfolio project.
+3. **Python + SQLite desktop/local application** — the original local-first application remains available through `py -3 server.py`.
 
-## Run the tracker on Windows
-1. Install Python 3.10 or newer from https://www.python.org/downloads/ and enable Add Python to PATH.
-2. Download this repository as a ZIP and extract it, or clone it with Git.
-3. Open the project folder and double-click start.bat, or run py -3 server.py.
-4. Open http://127.0.0.1:8765.
-5. Press Ctrl+C in the terminal to stop the app.
+## GitHub Pages
 
-## Prepare an application with browser assistance
-1. Double-click start_browser_assist.bat once to install Playwright and Chromium.
-2. Copy application_profile.example.json to application_profile.json.
-3. Fill in your details in application_profile.json on your computer. Do not upload this file to GitHub.
-4. Set resume_path to your local CV path, for example C:/Users/YourName/Documents/Resume.pdf.
-5. Run start_browser_assist.bat again and paste the official employer application URL.
-6. Sign in yourself if required. The browser profile stays in .browser-profile on your computer.
-7. Review every filled field and the attached CV. Correct anything inaccurate.
-8. Submit the application yourself on the employer website.
+The root `index.html` is the public career dashboard. The portfolio is available at `/portfolio/`.
 
-The helper only recognises common text fields; employer websites differ, so some fields may remain blank. It deliberately does not handle passwords, OTPs, CAPTCHAs, security questions or final submission. Never share login credentials or OTPs with this tool.
+To enable/verify Pages: GitHub repository → Settings → Pages → Deploy from a branch → `main` → `/ (root)`.
 
-## Privacy
-- SQLite database: data/mechcareer.sqlite3
-- Server binds only to 127.0.0.1.
-- Browser profile and personal application profile are excluded from Git.
-- Never commit your database, CV, certificates or personal documents to this public repository.
-- Back up the data folder regularly.
+The static dashboard stores job records and preferences in the current browser's localStorage. It supports adding/editing/deleting records, search/filter, status tracking, CSV export and JSON backup/import. **It does not sync records between devices and does not submit applications.** Do not store passwords, OTPs, sensitive identity data or private documents in it.
 
-## Job-search targeting
-- India-wide, full-time and Graduate Engineer Trainee opportunities.
-- Core mechanical roles: design, manufacturing, production, quality, maintenance, FEA, CFD and R&D.
-- ₹35,000/month salary target.
-- Exclude aerospace, UAV, defence and aircraft roles.
+## Local Python + SQLite application
 
-Live vacancy discovery must use current job-board or employer-career sources. Do not treat a saved record or unverified listing as an active vacancy.
+The existing local application is preserved:
+- Windows: double-click `start.bat`, or run `py -3 server.py`.
+- Open `http://127.0.0.1:8765`.
+- Data is stored locally in `data/mechcareer.sqlite3`.
+- Optional Playwright browser assistant: follow `start_browser_assist.bat` and the approval-first instructions below.
 
-## Architecture note
-This is a local Python web application, not a static GitHub Pages site. GitHub Pages cannot run a Python server or host a writable SQLite database. GitHub stores the source code; the app and database run on your Windows computer.
+The Python app binds only to localhost. It is not a public cloud server.
 
-## Troubleshooting
-- If py is not recognised, reinstall Python with Add Python to PATH enabled and reopen Command Prompt.
-- If port 8765 is busy, set MECHCAREER_PORT to 8766 and run py -3 server.py.
-- If browser setup fails, run py -3 -m pip install -r requirements.txt and py -3 -m playwright install chromium manually.
+## Browser-assisted application preparation
+
+1. Copy `application_profile.example.json` to `application_profile.json` on your computer.
+2. Fill it locally and keep it out of Git.
+3. Run `start_browser_assist.bat`, open an official employer application URL, and review every field.
+4. The helper deliberately does not click final submit buttons or handle passwords, OTPs, CAPTCHAs or security checks.
+
+## Candidate targeting
+
+- B.Tech Mechanical Engineering, 2026; VSSUT Burla; CGPA 8.02.
+- Around five months' mechanical design experience.
+- India-wide core mechanical opportunities; preferred salary ₹45,000/month, minimum target ₹35,000/month.
+- Exclude aerospace, UAV, drone, defence, aircraft and aviation vacancies.
+- Exclude LinkedIn listings and applications.
+
+## Privacy and safety
+
+- Never commit `data/`, `application_profile.json`, `.browser-profile/`, credentials, CVs or certificates.
+- Existing `.gitignore` and local Python application remain in place.
+- Verify vacancies on employer career pages; a saved record is not proof that a vacancy is live.
+- Mark applications as submitted only after a positive employer confirmation or sent-message record.
+
+## Project layout
+
+- `index.html`, `dashboard.css`, `dashboard.js` — GitHub Pages dashboard.
+- `portfolio/index.html` — integrated mechanical design portfolio.
+- `server.py`, `tests/`, `browser_assist.py`, `start*.bat` — original local application.

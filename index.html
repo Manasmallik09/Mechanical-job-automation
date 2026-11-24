@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101a27">
+<meta name="description" content="Manas Mallik's mechanical engineering career workspace and design portfolio.">
+<title>Manas Mallik | Mechanical Career Workspace</title>
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="./"><span class="gear">⚙</span> MANAS <i>/</i> CAREER SYSTEM</a><nav><a href="#tracker">Job tracker</a><a href="#profile">Candidate profile</a><a href="portfolio/">Mechanical portfolio ↗</a><a href="https://github.com/Manasmallik09/Mechanical-job-automation" target="_blank" rel="noopener">Source code ↗</a></nav></header>
+<main class="wrap">
+<section class="hero">
+<div><p class="eyebrow">MECHANICAL ENGINEERING · INDIA</p><h1>Build the next<br><em>career milestone.</em></h1><p class="intro">One workspace for mechanical engineering opportunities, application progress and your design portfolio.</p><div class="actions"><a class="primary" href="#tracker">Open job tracker <b>↘</b></a><a class="secondary" href="portfolio/">View engineering portfolio ↗</a></div></div>
+<div class="hero-panel"><div class="orbit"></div><div class="hero-metric"><small>MONTHLY SALARY TARGET</small><strong id="targetHero">₹35,000+</strong><span>Core mechanical roles · India-wide</span></div><div class="hero-stamp">MECH<br>CAREER<br><b>2026</b></div></div>
+</section>
+<section class="stats" aria-label="Application summary"><article><small>TRACKED JOBS</small><strong id="countAll">0</strong></article><article><small>TO REVIEW</small><strong id="countReview">0</strong></article><article><small>APPLIED</small><strong id="countApplied">0</strong></article><article><small>INTERVIEWS</small><strong id="countInterview">0</strong></article></section>
+<section class="workspace" id="tracker">
+<div class="section-title"><div><p class="eyebrow">OPPORTUNITY PIPELINE</p><h2>Mechanical job tracker</h2><p class="muted">Save verified vacancies, track applications and record confirmation details.</p></div><button class="primary" id="addBtn">＋ Add opportunity</button></div>
+<div class="toolbar"><input id="search" type="search" placeholder="Search role, company or location"><select id="filterStatus"><option value="">All stages</option><option>Saved</option><option>Shortlisted</option><option>Preparing</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option><option>Closed</option></select><select id="filterCategory"><option value="">All categories</option><option>Mechanical Design / CAD</option><option>Manufacturing / Production</option><option>Quality / Testing</option><option>Maintenance / Automation</option><option>FEA / CFD / Thermal</option><option>R&D / Product Development</option><option>GET / Graduate Trainee</option><option>Other core mechanical</option></select></div>
+<div class="table-wrap"><table><thead><tr><th>ROLE / COMPANY</th><th>LOCATION</th><th>SALARY</th><th>DEADLINE</th><th>STAGE</th><th>ACTIONS</th></tr></thead><tbody id="jobsBody"><tr><td colspan="6" class="empty">No opportunities saved yet. Add a vacancy after checking the employer's official careers page.</td></tr></tbody></table></div>
+<div class="table-actions"><button class="outline" id="exportBtn">Export CSV</button><button class="outline" id="backupBtn">Download JSON backup</button><label class="outline upload">Import backup<input type="file" id="importFile" accept="application/json"></label><span class="muted" id="storageInfo">Saved in this browser only.</span></div>
+</section>
+<section class="lower-grid" id="profile">
+<article class="info-card"><p class="eyebrow">CANDIDATE PROFILE</p><h2>Mechanical engineering</h2><dl><div><dt>Degree</dt><dd>B.Tech Mechanical Engineering · 2026</dd></div><div><dt>University</dt><dd>VSSUT Burla</dd></div><div><dt>CGPA</dt><dd>8.02</dd></div><div><dt>Experience</dt><dd>Engineer 1 – Mechanical Design · approx. 5 months</dd></div><div><dt>Academic record</dt><dd>Class 10: 87% · Class 12: 77% · No backlogs</dd></div></dl></article>
+<article class="info-card"><p class="eyebrow">SEARCH PREFERENCES</p><h2>Core roles only</h2><label class="setting">Minimum monthly salary (₹)<input id="salaryTarget" type="number" min="0" value="35000"></label><label class="setting">Preferred monthly salary (₹)<input id="salaryPreferred" type="number" min="0" value="45000"></label><p class="muted">India-wide · 0–2 years · employer websites and non-LinkedIn job boards. Excludes aerospace, UAV, drones, defence, aircraft and aviation roles.</p><button class="outline" id="saveSettings">Save preferences</button></article>
+</section>
+<section class="portfolio-callout"><div><p class="eyebrow">ENGINEERING PORTFOLIO</p><h2>See the design work behind the profile.</h2><p class="muted">CAD, mechanical design, analysis and project experience.</p></div><a class="primary" href="portfolio/">Explore portfolio ↗</a></section>
+<section class="note"><b>Important about data and deployment</b><p>This GitHub Pages dashboard saves records in the current browser using local storage. It does not sync between devices. For a private, multi-device SQLite workspace, run the existing Python application on your Windows computer with <code>py -3 server.py</code>. GitHub Pages cannot run Python or host a writable SQLite database. No job application is submitted by this dashboard.</p></section>
+<footer><span>© 2026 MANAS MALLIK · MECHANICAL CAREER WORKSPACE</span><span><a href="portfolio/">Portfolio</a> · <a href="https://github.com/Manasmallik09/Mechanical-job-automation">GitHub</a></span></footer>
+</main>
+<dialog id="jobDialog"><form id="jobForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">OPPORTUNITY RECORD</p><h2 id="dialogTitle">Add a job</h2></div><button type="button" class="close" id="closeDialog">×</button></div><input type="hidden" id="jobId"><div class="form-grid">
+<label>Job title *<input id="role" required maxlength="180"></label><label>Company *<input id="company" required maxlength="160"></label>
+<label>Location<input id="location"></label><label>Category<select id="category"><option>Mechanical Design / CAD</option><option>Manufacturing / Production</option><option>Quality / Testing</option><option>Maintenance / Automation</option><option>FEA / CFD / Thermal</option><option>R&D / Product Development</option><option>GET / Graduate Trainee</option><option>Other core mechanical</option></select></label>
+<label>Monthly salary / CTC<input id="salary" placeholder="Not disclosed"></label><label>Experience required<input id="experience" placeholder="0–1 year"></label>
+<label>Posted date<input id="posted" type="date"></label><label>Application deadline<input id="deadline" type="date"></label>
+<label class="wide">Official application URL<input id="url" type="url" placeholder="https://company.com/careers/..."></label>
+<label>Source<select id="source"><option>Employer careers page</option><option>Official application email</option><option>Non-LinkedIn job board</option><option>Other</option></select></label><label>Application stage<select id="stage"><option>Saved</option><option>Shortlisted</option><option>Preparing</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option><option>Closed</option></select></label>
+<label class="wide">Confirmation / reference number<input id="reference" placeholder="Only after confirmed submission"></label><label class="wide">Notes<textarea id="notes" rows="3" placeholder="Eligibility, salary details, next action..."></textarea></label>
+</div><p class="form-hint">Only mark a role as Applied after a positive employer confirmation or sent-message record.</p><div class="dialog-actions"><button type="button" class="outline" id="cancelDialog">Cancel</button><button class="primary" value="save">Save opportunity</button></div></form></dialog>
+<script src="dashboard.js"></script>
+</body></html>
